@@ -4,17 +4,37 @@ import { cookies } from "next/headers";
 import { Account, Client, Databases } from "node-appwrite";
 import { env } from "process";
 
-const serverClient = new Client()
-    .setEndpoint(env.APPWRITE_ENDPOINT!)
-    .setProject(env.APPWRITE_PROJECT_ID!)
-    .setKey(env.APPWRITE_SECRET_KEY!);
+// クライアントの初期化
+function initializeClient(endpoint: string, projectId: string, apiKey?: string) {
+    if (!endpoint || !projectId) {
+        throw new Error("Invalid Appwrite configuration");
+    }
 
-const sessionClient = new Client()
-    .setEndpoint(env.APPWRITE_ENDPOINT!)
-    .setProject(env.APPWRITE_PROJECT_ID!);
+    const client = new Client()
+        .setEndpoint(endpoint)
+        .setProject(projectId);
 
+    if (apiKey) {
+        client.setKey(apiKey);
+    }
 
-// make client session
+    return client;
+}
+
+// サーバー用クライアント
+const serverClient = initializeClient(
+    env.APPWRITE_ENDPOINT!,
+    env.APPWRITE_PROJECT_ID!,
+    env.APPWRITE_SECRET_KEY
+);
+
+// セッション用クライアント
+const sessionClient = initializeClient(
+    env.APPWRITE_ENDPOINT!,
+    env.APPWRITE_PROJECT_ID!
+);
+
+// セッションクライアントの作成
 export async function createSessionClient() {
     const session = (await cookies()).get(env.SESSION_NAME!);
     if (!session || !session.value) {
@@ -24,36 +44,34 @@ export async function createSessionClient() {
     sessionClient.setSession(session.value);
 
     return {
-        get account() {
-            return new Account(sessionClient);
-        }
+        account: new Account(sessionClient)
     };
 }
 
-// make admin client
+// 管理者クライアントの作成
 export async function createAdminClient() {
     return {
-        get account() {
-            return new Account(serverClient);
-        }
+        account: new Account(serverClient)
     };
 }
 
+// ログイン中のユーザーを取得
 export async function getLoggedInUser() {
     try {
         const { account } = await createSessionClient();
         return await account.get();
     } catch (error) {
+        console.error("Error fetching logged in user:", error);
         return null;
     }
 }
 
+// データベースクライアントの作成
 export async function createDatabaseClient() {
-    const db = new Databases(serverClient);
-
-    return db;
+    return new Databases(serverClient);
 }
 
+// サーバークライアントの作成
 export async function createServerClient() {
     return serverClient;
 }

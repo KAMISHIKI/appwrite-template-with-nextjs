@@ -13,11 +13,18 @@ import { NextResponse, NextRequest } from "next/server";
 export async function GET(request: NextRequest) {
   const secret = request.nextUrl.searchParams.get("secret");
   const userId = request.nextUrl.searchParams.get("userId");
+  const csrfToken = request.nextUrl.searchParams.get("csrfToken");
 
   const { account } = await createAdminClient();
-  if (!userId || !secret) {
+  if (!userId || !secret || !csrfToken) {
     return NextResponse.redirect(`${request.nextUrl.origin}/login/?error`);
   }
+
+  const savedCsrfToken = (await cookies()).get('csrfToken');
+  if (csrfToken !== savedCsrfToken) {
+    return NextResponse.redirect(`${request.nextUrl.origin}/login/?error=csrf`);
+  }
+
   const session = await account.createSession(userId, secret);
 
   (await cookies()).set(process.env.SESSION_NAME!, session.secret, {
@@ -27,7 +34,7 @@ export async function GET(request: NextRequest) {
     secure: true,
   });
 
-  return NextResponse
+  return NextResponse.redirect(`${request.nextUrl.origin}/`);
 }
 ```
 
